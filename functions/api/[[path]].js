@@ -2,6 +2,10 @@ import { MongoClient } from 'mongodb';
 import { anonymize, restore } from '../../lib/vault.js';
 
 const json = (body, status=200) => Response.json(body, {status, headers:{'Cache-Control':'no-store'}});
+function mongoDiagnostic(error) {
+  const message = String(error?.message || '').replace(/mongodb(?:\+srv)?:\/\/[^\s'"`]+/gi, '[MongoDB URI redacted]');
+  return {name:error?.name || 'Error', code:error?.code || error?.cause?.code || null, message:message.slice(0,240)};
+}
 async function database(env) {
   if (!env.MONGODB_URI) throw new Error('MONGODB_CONFIG');
   const client = new MongoClient(env.MONGODB_URI, {serverSelectionTimeoutMS:8000, connectTimeoutMS:8000});
@@ -31,7 +35,8 @@ export async function onRequestGet({env,params}) {
       .project({type:1,token:1,value:1,createdAt:1,_id:0})
       .toArray();
     return json({sessionId:latest.sessionId,mapeos});
-  } catch {
+  } catch (error) {
+    console.error('Privacy Vault MongoDB GET:', mongoDiagnostic(error));
     if (action === 'mappings') return json({error:'No se pudieron leer los datos guardados en Atlas.'},503);
     return json({ok:false,mongodb:false,geminiConfigured:Boolean(env.GEMINI_API_KEY),message:'No se pudo comprobar la conexión con MongoDB Atlas.'},503);
   } finally { if (db) await db.client.close().catch(()=>{}); }
@@ -63,7 +68,7 @@ export async function onRequestPost({request,env,params}) {
     if (action === 'anonymize') return json({anonymizedMessage:result.text,sessionId});
     if (!env.GEMINI_API_KEY) return json({error:'Gemini no está configurado en el backend.',code:'GEMINI_CONFIG'},503);
 
-    const model = env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const model = env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
     if (!/^[a-zA-Z0-9._-]+$/.test(model)) return json({error:'El nombre del modelo configurado no es válido.',code:'GEMINI_CONFIG'},503);
     phase = 'GEMINI_API';
     let response;
@@ -93,7 +98,7 @@ export async function onRequestPost({request,env,params}) {
     const persisted = mappings.map(({type,token,value,createdAt})=>({type,token,value,createdAt}));
     return json({original:message,ofuscado:result.text,respuestaGemini:generated,respuestaDesofuscada:restore(generated,mappings),sessionId,mapeos:persisted});
   } catch (error) {
-    console.error(`Privacy Vault ${phase}:`, error?.name || 'Error');
+    console.error(`Privacy Vault ${phase}:`, mongoDiagnostic(error));
     const messages = {
       MONGODB_CONFIG:'Configura MONGODB_URI en las variables del backend.',
       MONGODB_CONNECT:'MongoDB Atlas no respondió. Revisa URI, usuario, contraseña y lista de IP permitidas.',
