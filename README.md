@@ -16,7 +16,7 @@ Node.js 20+, MongoDB Atlas accesible desde Cloudflare y una clave de Gemini. Goo
 
 ## Desplegar en Cloudflare Pages
 
-Conecta el repositorio. Directorio de salida: `public`; comando de build: `npm install && npm run build`. `wrangler.toml` activa `nodejs_compat` para empaquetar MongoDB y define `SKIP_DEPENDENCY_INSTALL=1`, `MONGODB_DB` y `GEMINI_MODEL`. En **Settings > Variables and Secrets**, guarda `MONGODB_URI` y `GEMINI_API_KEY` como secretos de producción. Pages Functions usa MongoDB por TCP, así que Atlas necesita permitir las conexiones salientes de Cloudflare. En este demo el acceso de red de Atlas usa `0.0.0.0/0`: eso permite intentos desde cualquier IPv4. Limita permisos al usuario `taller_privacy_vault`, vigila el consumo y retira esa regla al terminar. Pages Functions usa MongoDB por TCP, así que Atlas necesita permitir las conexiones salientes de Cloudflare. En este demo el acceso de red de Atlas usa `0.0.0.0/0`: eso permite intentos desde cualquier IPv4. Limita permisos al usuario `taller_privacy_vault`, vigila el consumo y retira esa regla al terminar.
+Conecta el repositorio. Directorio de salida: `public`; comando de build: `npm install && npm run build`. `wrangler.toml` activa `nodejs_compat` para empaquetar MongoDB y define `SKIP_DEPENDENCY_INSTALL=1`, `MONGODB_DB` y `GEMINI_MODEL`. En **Settings > Variables and Secrets**, guarda `MONGODB_URI` y `GEMINI_API_KEY` como secretos de producción. Pages Functions usa MongoDB por TCP, así que Atlas necesita permitir las conexiones salientes de Cloudflare. En este demo el acceso de red de Atlas usa `0.0.0.0/0`: eso permite intentos desde cualquier IPv4. Limita permisos al usuario `taller_privacy_vault`, vigila el consumo y retira esa regla al terminar.
 
 ## API
 
@@ -32,6 +32,3 @@ El mapa se guarda en MongoDB por sesión. El modelo puede alterar u omitir token
 ## Pruebas y evidencias
 
 `npm test` comprueba sustitución, restauración y repetición con datos ficticios. La prueba de extremo a extremo requiere credenciales reales, acceso de red y un modelo habilitado. Registra capturas y resultados reales; no se incluyen evidencias inventadas. El taller original solicita OpenAI: esta implementación usa Gemini por decisión del equipo y debe explicarse al docente.
-
-
-En una implementación correcta, el registro muestra `SKIP_DEPENDENCY_INSTALL` antes del comando personalizado. Confirma también `nodejs_compat` en los ajustes de Pages Functions.
