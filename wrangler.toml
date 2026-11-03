@@ -1,0 +1,9 @@
+name = "taller-2-privacy-vault"
+pages_build_output_dir = "./public"
+compatibility_date = "2026-11-03"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+SKIP_DEPENDENCY_INSTALL = "1"
+MONGODB_DB = "privacy_vault"
+GEMINI_MODEL = "gemini-2.5-flash"
