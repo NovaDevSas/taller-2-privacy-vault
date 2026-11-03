@@ -32,3 +32,6 @@ El mapa se guarda en MongoDB por sesión. El modelo puede alterar u omitir token
 ## Pruebas y evidencias
 
 `npm test` comprueba sustitución, restauración y repetición con datos ficticios. La prueba de extremo a extremo requiere credenciales reales, acceso de red y un modelo habilitado. Registra capturas y resultados reales; no se incluyen evidencias inventadas. El taller original solicita OpenAI: esta implementación usa Gemini por decisión del equipo y debe explicarse al docente.
+
+
+En una implementación correcta, el registro muestra `SKIP_DEPENDENCY_INSTALL` antes del comando personalizado. Confirma también `nodejs_compat` en los ajustes de Pages Functions.
