@@ -1,4 +1,5 @@
 import { MongoClient } from 'mongodb';
+import { connect } from 'cloudflare:sockets';
 import { anonymize, restore } from '../../lib/vault.js';
 
 const json = (body, status=200) => Response.json(body, {status, headers:{'Cache-Control':'no-store'}});
@@ -20,9 +21,33 @@ async function database(env) {
   }
 }
 
-export async function onRequestGet({env,params}) {
+async function tlsProbe(hostname, port) {
+  const started = Date.now();
+  let socket;
+  try {
+    socket = connect({hostname,port},{secureTransport:'on'});
+    await Promise.race([
+      socket.opened,
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('probe timeout')),6000))
+    ]);
+    return {ok:true,milliseconds:Date.now()-started};
+  } catch (error) {
+    return {ok:false,milliseconds:Date.now()-started,error:String(error?.message || error).slice(0,120)};
+  } finally {
+    if (socket) await socket.close().catch(()=>{});
+  }
+}
+
+export async function onRequestGet({request,env,params}) {
   const action = (params.path || []).join('/');
   if (!['health','mappings'].includes(action)) return json({error:'Ruta no encontrada.'},404);
+  if (action === 'health' && new URL(request.url).searchParams.get('diagnostic') === 'tls') {
+    const [atlas,https] = await Promise.all([
+      tlsProbe('cluster0-shard-00-00.yrdc4.mongodb.net',27017),
+      tlsProbe('www.google.com',443)
+    ]);
+    return json({atlas,https});
+  }
   let db;
   try {
     db = await database(env);
