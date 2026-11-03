@@ -15,13 +15,24 @@ async function database(env) {
 }
 
 export async function onRequestGet({env,params}) {
-  if ((params.path || []).join('/') !== 'health') return json({error:'Ruta no encontrada.'},404);
+  const action = (params.path || []).join('/');
+  if (!['health','mappings'].includes(action)) return json({error:'Ruta no encontrada.'},404);
   let db;
   try {
     db = await database(env);
-    await db.client.db(env.MONGODB_DB || 'privacy_vault').command({ping:1});
-    return json({ok:true,mongodb:true,geminiConfigured:Boolean(env.GEMINI_API_KEY)});
+    if (action === 'health') {
+      await db.client.db(env.MONGODB_DB || 'privacy_vault').command({ping:1});
+      return json({ok:true,mongodb:true,geminiConfigured:Boolean(env.GEMINI_API_KEY)});
+    }
+    const latest = await db.collection.findOne({}, {sort:{createdAt:-1},projection:{sessionId:1}});
+    if (!latest) return json({sessionId:null,mapeos:[]});
+    const mapeos = await db.collection.find({sessionId:latest.sessionId})
+      .sort({createdAt:1})
+      .project({type:1,token:1,value:1,createdAt:1,_id:0})
+      .toArray();
+    return json({sessionId:latest.sessionId,mapeos});
   } catch {
+    if (action === 'mappings') return json({error:'No se pudieron leer los datos guardados en Atlas.'},503);
     return json({ok:false,mongodb:false,geminiConfigured:Boolean(env.GEMINI_API_KEY),message:'No se pudo comprobar la conexión con MongoDB Atlas.'},503);
   } finally { if (db) await db.client.close().catch(()=>{}); }
 }
@@ -79,7 +90,8 @@ export async function onRequestPost({request,env,params}) {
     if (!generated) return json({error:'Gemini no devolvió texto utilizable.',code:'GEMINI_API'},502);
     phase = 'MONGODB_READ';
     const mappings = await db.collection.find({sessionId}).toArray();
-    return json({original:message,ofuscado:result.text,respuestaGemini:generated,respuestaDesofuscada:restore(generated,mappings),sessionId});
+    const persisted = mappings.map(({type,token,value,createdAt})=>({type,token,value,createdAt}));
+    return json({original:message,ofuscado:result.text,respuestaGemini:generated,respuestaDesofuscada:restore(generated,mappings),sessionId,mapeos:persisted});
   } catch (error) {
     console.error(`Privacy Vault ${phase}:`, error?.name || 'Error');
     const messages = {
