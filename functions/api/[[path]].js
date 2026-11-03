@@ -26,7 +26,7 @@ async function database(env) {
   }
 }
 
-export async function onRequestGet({env,params}) {
+export async function onRequestGet({request,env,params}) {
   const action = (params.path || []).join('/');
   if (!['health','mappings'].includes(action)) return json({error:'Ruta no encontrada.'},404);
   let db;
@@ -46,7 +46,7 @@ export async function onRequestGet({env,params}) {
   } catch (error) {
     console.error('Privacy Vault MongoDB GET:', mongoDiagnostic(error));
     if (action === 'mappings') return json({error:'No se pudieron leer los datos guardados en Atlas.'},503);
-    return json({ok:false,mongodb:false,geminiConfigured:Boolean(env.GEMINI_API_KEY),message:'No se pudo comprobar la conexión con MongoDB Atlas.'},503);
+    return json({ok:false,mongodb:false,geminiConfigured:Boolean(env.GEMINI_API_KEY),message:'No se pudo comprobar la conexión con MongoDB Atlas.',...(new URL(request.url).searchParams.has('diagnostic')?{diagnostic:mongoDiagnostic(error)}:{})},503);
   } finally { if (db) await db.client.close().catch(()=>{}); }
 }
 
