@@ -10,7 +10,7 @@ function mongoDiagnostic(error) {
 }
 async function database(env) {
   if (!env.MONGODB_URI) throw new Error('MONGODB_CONFIG');
-  const client = new MongoClient(env.MONGODB_URI, {serverSelectionTimeoutMS:8000, connectTimeoutMS:8000});
+  const client = new MongoClient(env.MONGODB_URI, {serverSelectionTimeoutMS:8000, connectTimeoutMS:8000, family:4});
   try {
     await client.connect();
     return {client, collection:client.db(env.MONGODB_DB || 'privacy_vault').collection('mappings')};
