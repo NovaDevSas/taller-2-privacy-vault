@@ -25,6 +25,7 @@ Las peticiones usan JSON:
 - `POST /api/anonymize`, `{ "message": "..." }` → `{ anonymizedMessage, sessionId }`.
 - `POST /api/deanonymize`, `{ "anonymizedMessage": "...", "sessionId": "..." }` → `{ message }`.
 - `POST /api/secureChatGPT` (o `/api/chat`), `{ "prompt": "..." }` → original, ofuscado, respuestaGemini, respuestaDesofuscada y sessionId.
+- `GET /api/mappings` → registros de la última sesión, visibles en la pestaña Bóveda.
 
 El mapa se guarda en MongoDB por sesión. El modelo puede alterar u omitir tokens: solo los tokens exactos pueden restaurarse. Las rutas de esta demo no tienen autenticación. La conexión de Gemini tiene límites de consumo; despliega solo para la evaluación del curso y desactiva el proyecto cuando termines.
 
