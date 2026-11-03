@@ -1,7 +1,8 @@
 const $ = id => document.getElementById(id);
 const tabs = [...document.querySelectorAll('[data-tab]')];
 const pages = [...document.querySelectorAll('.page')];
-const sectionNames = {overview:'PANORAMA',lab:'LABORATORIO',flow:'RECORRIDO DEL DATO',vault:'BÓVEDA MONGODB',delivery:'ENTREGA'};
+const sectionNames = {overview:'Resumen',lab:'Prueba',flow:'Flujo',vault:'Bóveda',delivery:'Entrega'};
+let latestSession = '';
 
 function openTab(id) {
   tabs.forEach(tab => {
@@ -15,9 +16,10 @@ function openTab(id) {
     page.hidden = !active;
     page.classList.toggle('active', active);
   });
-  $('section-name').textContent = sectionNames[id] || 'PANORAMA';
+  $('section-name').textContent = sectionNames[id] || 'Resumen';
   history.replaceState(null, '', `#${id}`);
   if (id === 'lab') $('prompt').focus({preventScroll:true});
+  if (id === 'vault') loadPersistedMappings();
 }
 
 document.querySelectorAll('[data-tab], [data-tab-link], [data-go]').forEach(control => {
@@ -74,6 +76,53 @@ function findLikelyPii(text) {
   return patterns.flatMap(pattern=>[...text.matchAll(pattern)].map(match=>match[0]));
 }
 
+function showPersistedMappings(mappings, sessionId) {
+  const rows = $('mapping-rows');
+  rows.replaceChildren();
+  latestSession = sessionId || '';
+  $('vault-session').textContent = latestSession ? `Sesión ${latestSession}` : 'No hay una sesión reciente.';
+  $('db-state').textContent = mappings.length ? `${mappings.length} registros leídos de Atlas` : 'No se guardaron coincidencias';
+  if (!mappings.length) {
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 4;
+    cell.className = 'empty-row';
+    cell.textContent = 'No se encontraron datos para persistir en esta prueba.';
+    row.append(cell); rows.append(row); return;
+  }
+  const types = {NAME:'Nombre',EMAIL:'Correo',PHONE:'Teléfono'};
+  for (const mapping of mappings) {
+    const row = document.createElement('tr');
+    const values = [types[mapping.type] || mapping.type, mapping.token, mapping.value, mapping.createdAt ? new Date(mapping.createdAt).toLocaleString('es-CO') : ''];
+    for (const value of values) {
+      const cell = document.createElement('td');
+      cell.textContent = String(value ?? '');
+      row.append(cell);
+    }
+    rows.append(row);
+  }
+}
+
+async function loadPersistedMappings() {
+  $('db-state').textContent = 'Leyendo Atlas…';
+  try {
+    const response = await fetch('/api/mappings', {headers:{Accept:'application/json'}});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'No se pudieron leer los datos guardados.');
+    showPersistedMappings(data.mapeos || [], data.sessionId);
+  } catch {
+    $('db-state').textContent = 'No se pudo leer Atlas';
+    $('mapping-rows').replaceChildren();
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 4;
+    cell.className = 'empty-row';
+    cell.textContent = 'Revisa la conexión con Atlas e inténtalo de nuevo.';
+    row.append(cell);
+    $('mapping-rows').append(row);
+  }
+}
+
 $('send').addEventListener('click', async () => {
   const prompt = $('prompt').value;
   if (!prompt.trim()) { $('lab-status').textContent='Escribe un mensaje de prueba.'; $('prompt').focus(); return; }
@@ -81,7 +130,7 @@ $('send').addEventListener('click', async () => {
   button.disabled = true;
   button.textContent = 'Procesando…';
   $('lab-status').textContent = 'Protegiendo datos y consultando Gemini…';
-  $('run-state').textContent = 'EN CURSO';
+  $('run-state').textContent = 'En curso';
   $('error-box').hidden = true;
   $('results').hidden = true;
   try {
@@ -92,15 +141,16 @@ $('send').addEventListener('click', async () => {
     $('ofuscado').textContent = data.ofuscado;
     $('gemini').textContent = data.respuestaGemini;
     $('restaurado').textContent = data.respuestaDesofuscada;
+    showPersistedMappings(data.mapeos || [], data.sessionId);
     const found = findLikelyPii(prompt);
     const leaked = found.filter(value=>data.ofuscado.toLocaleLowerCase().includes(value.toLocaleLowerCase()));
     $('privacy-proof').textContent = leaked.length ? `Revisa: ${leaked.length} coincidencia(s) siguen visibles.` : `${found.length} coincidencia(s) de prueba no aparecen en el texto protegido.`;
     $('privacy-proof').style.color = leaked.length ? 'var(--error)' : 'var(--success)';
     $('results').hidden = false;
     $('lab-status').textContent = `Prueba completada · sesión ${data.sessionId.slice(0,8)}…`;
-    $('run-state').textContent = 'COMPLETADA';
+    $('run-state').textContent = 'Completada';
   } catch (error) {
-    $('run-state').textContent = 'REVISAR CONFIGURACIÓN';
+    $('run-state').textContent = 'Revisar configuración';
     $('lab-status').textContent = 'No se completó la prueba.';
     const messages = {
       MONGODB_CONNECT:'MongoDB Atlas no respondió. Revisa MONGODB_URI, la contraseña del usuario y la lista de IP permitidas.',
