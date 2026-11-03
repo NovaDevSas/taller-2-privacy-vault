@@ -4,7 +4,9 @@ import { anonymize, restore } from '../../lib/vault.js';
 const json = (body, status=200) => Response.json(body, {status, headers:{'Cache-Control':'no-store'}});
 function mongoDiagnostic(error) {
   const message = String(error?.message || '').replace(/mongodb(?:\+srv)?:\/\/[^\s'"`]+/gi, '[MongoDB URI redacted]');
-  return {name:error?.name || 'Error', code:error?.code || error?.cause?.code || null, message:message.slice(0,240)};
+  const servers = error?.reason?.servers;
+  const hosts = servers && typeof servers.keys === 'function' ? [...servers.keys()] : [];
+  return {name:error?.name || 'Error', code:error?.code || error?.cause?.code || null, message:message.slice(0,240), hosts};
 }
 async function database(env) {
   if (!env.MONGODB_URI) throw new Error('MONGODB_CONFIG');
