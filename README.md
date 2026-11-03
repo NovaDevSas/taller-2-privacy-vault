@@ -16,7 +16,7 @@ Node.js 20+, MongoDB Atlas accesible desde Cloudflare y una clave de Gemini. Goo
 
 ## Desplegar en Cloudflare Pages
 
-Conecta el repositorio. Directorio de salida: `public`; comando de build: `npm run build`; activa `nodejs_compat`. Configura `MONGODB_URI`, `MONGODB_DB`, `GEMINI_API_KEY` y `GEMINI_MODEL` en **Settings > Variables and Secrets**; guarda las credenciales como secretos. Pages Functions usa MongoDB por TCP, así que Atlas necesita permitir las conexiones salientes de Cloudflare. En este demo el acceso de red de Atlas usa `0.0.0.0/0`: eso permite intentos desde cualquier IPv4. Limita permisos al usuario `taller_privacy_vault`, vigila el consumo y retira esa regla al terminar.
+Conecta el repositorio. Directorio de salida: `public`; comando de build: `npm install && npm run build`. `wrangler.toml` activa `nodejs_compat`, necesario para empaquetar el driver de MongoDB en Pages Functions. Si Pages usa `npm ci` automático, configura `SKIP_DEPENDENCY_INSTALL=1` para que se ejecute el comando de build personalizado. Configura `MONGODB_URI`, `MONGODB_DB`, `GEMINI_API_KEY` y `GEMINI_MODEL` en **Settings > Variables and Secrets**; guarda las credenciales como secretos. Pages Functions usa MongoDB por TCP, así que Atlas necesita permitir las conexiones salientes de Cloudflare. En este demo el acceso de red de Atlas usa `0.0.0.0/0`: eso permite intentos desde cualquier IPv4. Limita permisos al usuario `taller_privacy_vault`, vigila el consumo y retira esa regla al terminar.
 
 ## API
 
