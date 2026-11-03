@@ -1,13 +1,18 @@
 import { MongoClient } from 'mongodb';
-import { connect } from 'cloudflare:sockets';
 import { anonymize, restore } from '../../lib/vault.js';
 
 const json = (body, status=200) => Response.json(body, {status, headers:{'Cache-Control':'no-store'}});
 function mongoDiagnostic(error) {
   const message = String(error?.message || '').replace(/mongodb(?:\+srv)?:\/\/[^\s'"`]+/gi, '[MongoDB URI redacted]');
   const servers = error?.reason?.servers;
-  const hosts = servers && typeof servers.keys === 'function' ? [...servers.keys()] : [];
-  return {name:error?.name || 'Error', code:error?.code || error?.cause?.code || null, message:message.slice(0,240), hosts};
+  const details = servers && typeof servers.entries === 'function' ? [...servers.entries()].map(([host,server])=>({
+    host,
+    type:server?.type || null,
+    errorName:server?.error?.name || null,
+    errorCode:server?.error?.code || null,
+    errorMessage:String(server?.error?.message || '').replace(/mongodb(?:\+srv)?:\/\/[^\s'"`]+/gi, '[MongoDB URI redacted]').slice(0,180)
+  })) : [];
+  return {name:error?.name || 'Error', code:error?.code || error?.cause?.code || null, message:message.slice(0,240), servers:details};
 }
 async function database(env) {
   if (!env.MONGODB_URI) throw new Error('MONGODB_CONFIG');
@@ -21,33 +26,9 @@ async function database(env) {
   }
 }
 
-async function tlsProbe(hostname, port) {
-  const started = Date.now();
-  let socket;
-  try {
-    socket = connect({hostname,port},{secureTransport:'on'});
-    await Promise.race([
-      socket.opened,
-      new Promise((_,reject)=>setTimeout(()=>reject(new Error('probe timeout')),6000))
-    ]);
-    return {ok:true,milliseconds:Date.now()-started};
-  } catch (error) {
-    return {ok:false,milliseconds:Date.now()-started,error:String(error?.message || error).slice(0,120)};
-  } finally {
-    if (socket) await socket.close().catch(()=>{});
-  }
-}
-
-export async function onRequestGet({request,env,params}) {
+export async function onRequestGet({env,params}) {
   const action = (params.path || []).join('/');
   if (!['health','mappings'].includes(action)) return json({error:'Ruta no encontrada.'},404);
-  if (action === 'health' && new URL(request.url).searchParams.get('diagnostic') === 'tls') {
-    const [atlas,https] = await Promise.all([
-      tlsProbe('cluster0-shard-00-00.yrdc4.mongodb.net',27017),
-      tlsProbe('www.google.com',443)
-    ]);
-    return json({atlas,https});
-  }
   let db;
   try {
     db = await database(env);
