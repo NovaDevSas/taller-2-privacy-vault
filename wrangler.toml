@@ -6,4 +6,4 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 SKIP_DEPENDENCY_INSTALL = "1"
 MONGODB_DB = "privacy_vault"
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.5-flash-lite"
