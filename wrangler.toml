@@ -1,7 +1,7 @@
 name = "taller-2-privacy-vault"
 pages_build_output_dir = "./public"
 compatibility_date = "2026-11-03"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = ["nodejs_compat_v2"]
 
 [vars]
 SKIP_DEPENDENCY_INSTALL = "1"
