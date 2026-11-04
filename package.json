@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node --test",
     "dev": "wrangler pages dev public --compatibility-date=2026-11-03 --compatibility-flags=nodejs_compat_v2",
-    "build": "node --check functions/api/[[path]].js && node --check lib/vault.js && node --check lib/cloudflare-mongo-tls.js && node scripts/patch-mongo-tls.js && wrangler pages functions build functions --outdir public/.worker-build --build-output-directory public --project-directory . --compatibility-date=2026-11-03 --compatibility-flags=nodejs_compat_v2 --minify && mv public/.worker-build/index.js public/_worker.js && rmdir public/.worker-build"
+    "build": "node --check functions/api/[[path]].js && node --check lib/vault.js && node --check lib/GeminiClient.js && node --check lib/cloudflare-mongo-tls.js && node scripts/patch-mongo-tls.js && wrangler pages functions build functions --outdir public/.worker-build --build-output-directory public --project-directory . --compatibility-date=2026-11-03 --compatibility-flags=nodejs_compat_v2 --minify && mv public/.worker-build/index.js public/_worker.js && rmdir public/.worker-build"
   },
   "dependencies": {
     "mongodb": "^6.20.0"

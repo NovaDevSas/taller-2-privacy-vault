@@ -1,5 +1,6 @@
 import { MongoClient } from 'mongodb';
 import { anonymize, restore } from '../../lib/vault.js';
+import { GeminiClient, GeminiError } from '../../lib/GeminiClient.js';
 
 const json = (body, status=200) => Response.json(body, {status, headers:{'Cache-Control':'no-store'}});
 function mongoDiagnostic(error) {
@@ -26,7 +27,7 @@ async function database(env) {
   }
 }
 
-export async function onRequestGet({request,env,params}) {
+export async function onRequestGet({env,params}) {
   const action = (params.path || []).join('/');
   if (!['health','mappings'].includes(action)) return json({error:'Ruta no encontrada.'},404);
   let db;
@@ -46,7 +47,7 @@ export async function onRequestGet({request,env,params}) {
   } catch (error) {
     console.error('Privacy Vault MongoDB GET:', mongoDiagnostic(error));
     if (action === 'mappings') return json({error:'No se pudieron leer los datos guardados en Atlas.'},503);
-    return json({ok:false,mongodb:false,geminiConfigured:Boolean(env.GEMINI_API_KEY),message:'No se pudo comprobar la conexión con MongoDB Atlas.',...(new URL(request.url).searchParams.has('diagnostic')?{diagnostic:mongoDiagnostic(error)}:{})},503);
+    return json({ok:false,mongodb:false,geminiConfigured:Boolean(env.GEMINI_API_KEY),message:'No se pudo comprobar la conexión con MongoDB Atlas.'},503);
   } finally { if (db) await db.client.close().catch(()=>{}); }
 }
 
@@ -74,33 +75,16 @@ export async function onRequestPost({request,env,params}) {
     phase = 'MONGODB_SAVE';
     if (result.mappings.length) await db.collection.insertMany(result.mappings.map(mapping=>({...mapping,sessionId,createdAt:new Date()})));
     if (action === 'anonymize') return json({anonymizedMessage:result.text,sessionId});
-    if (!env.GEMINI_API_KEY) return json({error:'Gemini no está configurado en el backend.',code:'GEMINI_CONFIG'},503);
-
-    const model = env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
-    if (!/^[a-zA-Z0-9._-]+$/.test(model)) return json({error:'El nombre del modelo configurado no es válido.',code:'GEMINI_CONFIG'},503);
+    // Actividad 3: enviar el prompt protegido al modelo con la clase GeminiClient.
     phase = 'GEMINI_API';
-    let response;
+    let generated;
     try {
-      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},
-        body:JSON.stringify({
-          systemInstruction:{parts:[{text:'Conserva exactamente los identificadores NAME_, EMAIL_ y PHONE_ que aparezcan en la solicitud. No inventes datos personales.'}]},
-          contents:[{parts:[{text:result.text}]}]
-        })
-      });
-    } catch { return json({error:'No se pudo conectar con Gemini. Revisa la conectividad del backend.',code:'GEMINI_API'},502); }
-
-    if (!response.ok) {
-      if (response.status === 429) return json({error:'Gemini alcanzó el límite de uso del proyecto.',code:'GEMINI_429'},429);
-      if (response.status === 403 || response.status === 401) return json({error:'Gemini rechazó la clave o el acceso al proyecto.',code:'GEMINI_403'},502);
-      if (response.status === 404) return json({error:'El modelo configurado no está disponible para esta clave.',code:'GEMINI_404'},502);
-      return json({error:'Gemini no pudo completar la solicitud.',code:'GEMINI_API'},502);
+      const gemini = new GeminiClient({apiKey:env.GEMINI_API_KEY, model:env.GEMINI_MODEL || 'gemini-3.5-flash-lite'});
+      generated = await gemini.complete(result.text);
+    } catch (error) {
+      if (error instanceof GeminiError) return json({error:error.message,code:error.code},error.status);
+      throw error;
     }
-
-    const data = await response.json();
-    const generated = data.candidates?.[0]?.content?.parts?.map(part=>part.text || '').join('');
-    if (!generated) return json({error:'Gemini no devolvió texto utilizable.',code:'GEMINI_API'},502);
     phase = 'MONGODB_READ';
     const mappings = await db.collection.find({sessionId}).toArray();
     const persisted = mappings.map(({type,token,value,createdAt})=>({type,token,value,createdAt}));
